@@ -504,6 +504,55 @@
     letter-spacing:0.02em;
   }
   .band-spotify svg{width:19px; height:19px;}
+  .band-albums-grid{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap:10px;
+  }
+  .album-card{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .album-cover-wrap{
+    position:relative;
+    width:100%;
+    aspect-ratio:1/1;
+    border-radius:6px;
+    overflow:hidden;
+    background:var(--bg);
+    border:1px solid var(--line);
+  }
+  .album-cover-wrap img{
+    width:100%; height:100%;
+    object-fit:cover;
+    display:block;
+    opacity:0;
+    transition:opacity 0.25s;
+  }
+  .album-cover-wrap img.loaded{ opacity:1; }
+  .album-cover-fallback{
+    position:absolute; inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:22px;
+    color:var(--bone-dim);
+  }
+  .album-title{
+    font-size:11px;
+    line-height:1.3;
+    color:var(--bone);
+    overflow:hidden;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+  }
+  .album-year{
+    font-size:10px;
+    color:var(--bone-dim);
+  }
+  .album-card a{ text-decoration:none; }
   .band-empty{
     text-align:center;
     padding:40px 20px;
@@ -704,6 +753,56 @@
   // ---------- Band detail sheet ----------
   const bandSheet = document.getElementById("bandSheet");
   const bandClose = document.getElementById("bandClose");
+  const albumCoverCache = {}; // spotify URL -> image URL (avoid refetching)
+
+  async function fetchSpotifyCover(spotifyUrl){
+    if(albumCoverCache[spotifyUrl] !== undefined) return albumCoverCache[spotifyUrl];
+    try{
+      const res = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(spotifyUrl)}`);
+      if(!res.ok) throw new Error("oembed failed");
+      const data = await res.json();
+      albumCoverCache[spotifyUrl] = data.thumbnail_url || null;
+    } catch(e){
+      albumCoverCache[spotifyUrl] = null;
+    }
+    return albumCoverCache[spotifyUrl];
+  }
+
+  function renderAlbumsGrid(albums){
+    if(!albums || !albums.length) return "";
+    let html = `<div class="band-section-label">Albums</div><div class="band-albums-grid">`;
+    albums.forEach((album, i)=>{
+      html += `
+        <div class="album-card">
+          <a href="${album.spotify}" target="_blank" rel="noopener">
+            <div class="album-cover-wrap">
+              <div class="album-cover-fallback" id="albumFallback-${i}">💿</div>
+              <img id="albumImg-${i}" alt="${album.title}">
+            </div>
+          </a>
+          <div class="album-title">${album.title}</div>
+          <div class="album-year">${album.year}</div>
+        </div>`;
+    });
+    html += `</div>`;
+    return html;
+  }
+
+  function loadAlbumCovers(albums){
+    if(!albums || !albums.length) return;
+    albums.forEach((album, i)=>{
+      fetchSpotifyCover(album.spotify).then(url=>{
+        const img = document.getElementById(`albumImg-${i}`);
+        const fallback = document.getElementById(`albumFallback-${i}`);
+        if(!img) return; // sheet closed/changed before fetch resolved
+        if(url){
+          img.src = url;
+          img.onload = ()=>{ img.classList.add("loaded"); if(fallback) fallback.style.display = "none"; };
+          img.onerror = ()=>{ /* keep fallback visible */ };
+        }
+      });
+    });
+  }
 
   function openBandSheet(set, dayId){
     const stage = stageById[set.stage];
@@ -753,6 +852,7 @@
     if(info.origin){
       html += `<div class="band-section-label">Origine</div><div class="band-origin">${info.origin}</div>`;
     }
+    html += renderAlbumsGrid(info.albums);
     if(info.spotify){
       html += `
         <a class="band-spotify" href="${info.spotify}" target="_blank" rel="noopener">
@@ -763,6 +863,7 @@
 
     body.innerHTML = html;
     openSheetGeneric(bandSheet);
+    loadAlbumCovers(info.albums);
   }
 
   function openSheetGeneric(el){

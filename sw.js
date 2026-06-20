@@ -1,6 +1,6 @@
 // Service Worker — Motocultor 2026
 // Cache-first : une fois l'app chargée une fois, tout fonctionne hors ligne.
-const CACHE_NAME = "motocultor2026-v2";
+const CACHE_NAME = "motocultor2026-v3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -29,6 +29,16 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  const url = new URL(event.request.url);
+  // Laisser passer les requêtes externes (Spotify oEmbed, pochettes d'album,
+  // images Wikimedia) sans tenter de les mettre en cache applicatif : elles
+  // sont gérées par le cache HTTP normal du navigateur, et ça évite tout
+  // souci avec les réponses "opaque" cross-origin.
+  if (url.origin !== self.location.origin) {
+    return; // laisse le navigateur gérer nativement (pas de respondWith)
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
