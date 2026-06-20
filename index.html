@@ -215,6 +215,8 @@
   .set-card.live{
     box-shadow: 0 0 0 1px var(--gold) inset;
   }
+  .set-card.clickable{ cursor:pointer; }
+  .set-card.clickable:active{ background:#1e1b13; }
   .set-time{
     flex:0 0 64px;
     padding:12px 8px;
@@ -242,9 +244,7 @@
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
-    cursor:pointer;
   }
-  .set-band:active{ opacity:0.7; }
   .set-band.tbc{color:var(--bone-dim); font-style:italic; font-weight:400;}
   .set-stage{
     font-size:11px;
@@ -889,7 +889,7 @@
     const isTbc = /tbc/i.test(set.band);
 
     const card = document.createElement("div");
-    card.className = "set-card" + (isLive ? " live":"");
+    card.className = "set-card" + (isLive ? " live":"") + (isTbc ? "" : " clickable");
     card.style.setProperty("--stage-color", stage.color);
 
     card.innerHTML = `
@@ -909,7 +909,8 @@
       </button>
     `;
 
-    card.querySelector(".fav-btn").addEventListener("click", ()=>{
+    card.querySelector(".fav-btn").addEventListener("click", (e)=>{
+      e.stopPropagation();
       if(state.favorites.has(key)){
         state.favorites.delete(key);
       } else {
@@ -920,7 +921,7 @@
     });
 
     if(!isTbc){
-      card.querySelector(".set-band").addEventListener("click", ()=>{
+      card.addEventListener("click", ()=>{
         openBandSheet(set, dayId);
       });
     }
