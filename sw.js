@@ -1,10 +1,11 @@
 // Service Worker — Motocultor 2026
 // Cache-first : une fois l'app chargée une fois, tout fonctionne hors ligne.
-const CACHE_NAME = "motocultor2026-v1";
+const CACHE_NAME = "motocultor2026-v2";
 const ASSETS = [
   "./",
   "./index.html",
   "./data.js",
+  "./bands.js",
   "./manifest.json",
   "./icon.svg",
   "./icon-192.png",

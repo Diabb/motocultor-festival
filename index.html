@@ -242,7 +242,9 @@
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
+    cursor:pointer;
   }
+  .set-band:active{ opacity:0.7; }
   .set-band.tbc{color:var(--bone-dim); font-style:italic; font-weight:400;}
   .set-stage{
     font-size:11px;
@@ -385,6 +387,140 @@
   .sheet .stage-legend div{display:flex; align-items:center; gap:8px; font-size:13px; padding:4px 0;}
   .sheet .stage-legend .sw{width:10px;height:10px;border-radius:50%;}
 
+  /* Band detail sheet */
+  .band-sheet{
+    position:fixed;
+    inset:0;
+    background:var(--bg);
+    z-index:40;
+    transform:translateY(100%);
+    transition:transform 0.28s cubic-bezier(.32,.72,0,1);
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .band-sheet.show{ transform:translateY(0); }
+  .band-hero{
+    position:relative;
+    min-height:200px;
+    background:var(--bg-raised);
+    display:flex;
+    align-items:flex-end;
+    padding: calc(var(--safe-top) + 16px) 18px 16px;
+    overflow:hidden;
+  }
+  .band-hero-img{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit:cover;
+    opacity:0.55;
+  }
+  .band-hero::after{
+    content:"";
+    position:absolute; inset:0;
+    background:linear-gradient(180deg, rgba(14,13,10,0.15) 0%, rgba(14,13,10,0.95) 100%);
+  }
+  .band-hero-content{ position:relative; z-index:1; width:100%; }
+  .band-close{
+    position:absolute;
+    top: calc(var(--safe-top) + 14px);
+    right:16px;
+    z-index:2;
+    width:34px; height:34px;
+    border-radius:50%;
+    background:rgba(14,13,10,0.6);
+    border:1px solid var(--line);
+    color:var(--bone);
+    font-size:18px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+  }
+  .band-name{
+    font-size:26px;
+    line-height:1.05;
+    color:var(--bone);
+  }
+  .band-stage-tag{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:11.5px;
+    color:var(--bone-dim);
+    margin-top:8px;
+    letter-spacing:0.03em;
+  }
+  .band-stage-tag .sw{width:8px;height:8px;border-radius:50%;}
+  .band-body{ padding:18px; }
+  .band-genre-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:7px;
+    margin-bottom:16px;
+  }
+  .band-tag{
+    font-size:11px;
+    padding:5px 10px;
+    border-radius:20px;
+    border:1px solid var(--line);
+    color:var(--rust-bright);
+    letter-spacing:0.03em;
+  }
+  .band-section-label{
+    font-size:10.5px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--bone-dim);
+    margin:18px 0 6px;
+  }
+  .band-section-label:first-child{ margin-top:0; }
+  .band-bio{
+    font-size:14px;
+    line-height:1.65;
+    color:var(--bone);
+  }
+  .band-members{
+    font-size:13.5px;
+    line-height:1.8;
+    color:var(--bone);
+  }
+  .band-origin{
+    font-size:13.5px;
+    color:var(--bone);
+  }
+  .band-spotify{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+    margin-top:22px;
+    padding:13px;
+    background:#1DB954;
+    color:#0e0d0a;
+    border-radius:8px;
+    font-weight:700;
+    font-size:13.5px;
+    text-decoration:none;
+    letter-spacing:0.02em;
+  }
+  .band-spotify svg{width:19px; height:19px;}
+  .band-empty{
+    text-align:center;
+    padding:40px 20px;
+    color:var(--bone-dim);
+  }
+  .band-empty .be-icon{ font-size:28px; margin-bottom:10px; opacity:0.5; }
+  .band-empty .be-title{ font-family:inherit; font-size:14.5px; color:var(--bone); margin-bottom:5px; }
+  .band-empty .be-sub{ font-size:12.5px; line-height:1.5; }
+  .band-time-row{
+    display:flex;
+    gap:18px;
+    margin-top:14px;
+    font-size:12.5px;
+    color:var(--bone-dim);
+  }
+  .band-time-row b{ color:var(--bone); font-weight:700; }
+
   ::-webkit-scrollbar{width:0;height:0;}
 </style>
 </head>
@@ -446,7 +582,21 @@
   <div class="stage-legend" id="stageLegend"></div>
 </div>
 
+<div class="band-sheet" id="bandSheet">
+  <button class="band-close" id="bandClose" aria-label="Fermer">×</button>
+  <div class="band-hero" id="bandHero">
+    <img class="band-hero-img" id="bandHeroImg" src="" alt="" style="display:none;">
+    <div class="band-hero-content">
+      <div class="band-name display" id="bandName"></div>
+      <div class="band-stage-tag" id="bandStageTag"></div>
+      <div class="band-time-row" id="bandTimeRow"></div>
+    </div>
+  </div>
+  <div class="band-body" id="bandBody"></div>
+</div>
+
 <script src="data.js"></script>
+<script src="bands.js"></script>
 <script>
 (function(){
   "use strict";
@@ -550,6 +700,78 @@
     syncTopUI();
   }
   backdrop.addEventListener("click", closeSheet);
+
+  // ---------- Band detail sheet ----------
+  const bandSheet = document.getElementById("bandSheet");
+  const bandClose = document.getElementById("bandClose");
+
+  function openBandSheet(set, dayId){
+    const stage = stageById[set.stage];
+    const day = FESTIVAL_DATA.days.find(d=>d.id===dayId);
+    const info = BAND_INFO[set.band];
+
+    document.getElementById("bandName").textContent = set.band;
+    document.getElementById("bandStageTag").innerHTML =
+      `<span class="sw" style="background:${stage.color}"></span>${stage.name}`;
+    document.getElementById("bandTimeRow").innerHTML =
+      `<span><b>${day ? day.label : ''}</b></span><span>${set.start} – ${set.end}</span>`;
+
+    const heroImg = document.getElementById("bandHeroImg");
+    if(info && info.image){
+      heroImg.src = info.image;
+      heroImg.style.display = "block";
+      heroImg.onerror = ()=>{ heroImg.style.display = "none"; };
+    } else {
+      heroImg.style.display = "none";
+      heroImg.src = "";
+    }
+
+    const body = document.getElementById("bandBody");
+
+    if(!info){
+      body.innerHTML = `
+        <div class="band-empty">
+          <div class="be-icon">🎸</div>
+          <div class="be-title display">Infos à venir</div>
+          <div class="be-sub">La fiche de ce groupe n'est pas encore renseignée.<br>Reviens plus tard pour le genre, les membres et le lien Spotify.</div>
+        </div>`;
+      openSheetGeneric(bandSheet);
+      return;
+    }
+
+    let html = "";
+
+    if(info.genre){
+      html += `<div class="band-genre-row"><span class="band-tag">${info.genre}</span></div>`;
+    }
+    if(info.bio){
+      html += `<div class="band-section-label">À propos</div><div class="band-bio">${info.bio}</div>`;
+    }
+    if(info.members && info.members.length){
+      html += `<div class="band-section-label">Membres</div><div class="band-members">${info.members.join("<br>")}</div>`;
+    }
+    if(info.origin){
+      html += `<div class="band-section-label">Origine</div><div class="band-origin">${info.origin}</div>`;
+    }
+    if(info.spotify){
+      html += `
+        <a class="band-spotify" href="${info.spotify}" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 4.32-1.32 9.719-.66 13.439 1.62.361.181.54.78.301 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.18-1.2-.18-1.38-.721-.18-.6.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+          Écouter sur Spotify
+        </a>`;
+    }
+
+    body.innerHTML = html;
+    openSheetGeneric(bandSheet);
+  }
+
+  function openSheetGeneric(el){
+    el.classList.add("show");
+  }
+  function closeBandSheet(){
+    bandSheet.classList.remove("show");
+  }
+  bandClose.addEventListener("click", closeBandSheet);
 
   const legend = document.getElementById("stageLegend");
   FESTIVAL_DATA.stages.forEach(s=>{
@@ -696,6 +918,12 @@
       saveFavorites();
       render();
     });
+
+    if(!isTbc){
+      card.querySelector(".set-band").addEventListener("click", ()=>{
+        openBandSheet(set, dayId);
+      });
+    }
 
     return card;
   }
